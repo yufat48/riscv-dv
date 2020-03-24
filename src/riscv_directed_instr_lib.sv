@@ -31,7 +31,11 @@ class riscv_directed_instr_stream extends riscv_rand_instr_stream;
       instr_list[i].atomic = 1'b1;
     end
     instr_list[0].comment = $sformatf("Start %0s", get_name());
+    `ifdef EXP
+    instr_list[instr_list.size()-1].comment = $sformatf("End %0s", get_name());
+    `else
     instr_list[$].comment = $sformatf("End %0s", get_name());
+    `endif
     if(label!= "") begin
       instr_list[0].label = label;
       instr_list[0].has_label = 1'b1;
@@ -77,7 +81,12 @@ class riscv_mem_access_stream extends riscv_directed_instr_stream;
       la_instr.imm_str = $sformatf("%0s%0s+%0d",
                                    hart_prefix(hart), cfg.mem_region[id].name, base);
     end
+    `ifdef EXP
+	    instr_list = new[instr_list.size()+1](instr_list);
+	    insert_dynamic(la_instr, 0);
+    `else
     instr_list.push_front(la_instr);
+    `endif
   endfunction
 
   // Insert some other instructions to mix with mem_access instruction
@@ -469,14 +478,24 @@ class riscv_int_numeric_corner_stream extends riscv_directed_instr_stream;
       init_instr[i].rd = avail_regs[i];
       init_instr[i].pseudo_instr_name = LI;
       init_instr[i].imm_str = $sformatf("0x%0x", init_val[i]);
+      `ifdef EXP
+	     instr_list = new[instr_list.size()+1](instr_list);
+      insert_dynamic(init_instr[i],instr_list.size()-1);
+      `else
       instr_list.push_back(init_instr[i]);
+      `endif
     end
     for (int i = 0; i < num_of_instr; i++) begin
       riscv_instr instr = riscv_instr::get_rand_instr(
         .include_category({ARITHMETIC}),
         .exclude_group({RV32C, RV64C, RV32F, RV64F, RV32D, RV64D}));
       randomize_gpr(instr);
+      `ifdef EXP
+      instr_list = new[instr_list.size()+1](instr_list);
+      insert_dynamic(instr,instr_list.size()-1);
+      `else
       instr_list.push_back(instr);
+      `endif
     end
     super.post_randomize();
   endfunction

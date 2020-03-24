@@ -20,7 +20,11 @@
 // instruction, mix two instruction streams etc.
 class riscv_instr_stream extends uvm_object;
 
+`ifdef EXP
+  riscv_instr           instr_list[];
+`else
   riscv_instr           instr_list[$];
+`endif
   int unsigned          instr_cnt;
   string                label = "";
   // User can specify a small group of available registers to generate various hazard condition
@@ -35,29 +39,59 @@ class riscv_instr_stream extends uvm_object;
 
   // Initialize the instruction stream, create each instruction instance
   function void initialize_instr_list(int unsigned instr_cnt);
+	  `ifdef EXP
+    instr_list =new[instr_cnt];
+	  `else
     instr_list = {};
+    `endif
     this.instr_cnt = instr_cnt;
     create_instr_instance();
   endfunction
 
   virtual function void create_instr_instance();
     riscv_instr instr;
+    `ifdef EXP
+	    instr_list = new[instr_cnt];
+    `endif
     for(int i = 0; i < instr_cnt; i++) begin
       instr = riscv_instr::type_id::create($sformatf("instr_%0d", i));
+      `ifdef EXP
+      instr_list[i] = instr;
+      `else
       instr_list.push_back(instr);
+      `endif
     end
   endfunction
 
+ `ifdef EXP
+	function void insert_dynamic(riscv_instr instr, int idx);
+
+    int current_instr_cnt = instr_list.size();
+		for (int i = current_instr_cnt; i> idx; i--)
+		begin
+			instr_list[i] = instr_list[i-1];
+		end
+		instr_list[idx] = instr;
+
+	endfunction
+ `endif
   // Insert an instruction to the existing instruction stream at the given index
   // When index is -1, the instruction is injected at a random location
   function void insert_instr(riscv_instr instr, int idx = -1);
     int current_instr_cnt = instr_list.size();
+    `ifdef EXP
+		instr_list = new[current_instr_cnt+1](instr_list);
+    `endif
     if(idx == -1) begin
       idx = $urandom_range(0, current_instr_cnt-1);
       while(instr_list[idx].atomic) begin
        idx += 1;
        if (idx == current_instr_cnt - 1) begin
+       `ifdef EXP
+	       instr_list[current_instr_cnt] = instr;
+       `else
          instr_list = {instr_list, instr};
+       `endif
          return;
        end
       end
@@ -65,7 +99,11 @@ class riscv_instr_stream extends uvm_object;
       `uvm_error(`gfn, $sformatf("Cannot insert instr:%0s at idx %0d",
                        instr.convert2asm(), idx))
     end
+    `ifdef EXP
+    insert_dynamic(instr,idx);
+    `else
     instr_list.insert(idx, instr);
+    `endif
   endfunction
 
   // Insert an instruction to the existing instruction stream at the given index
@@ -81,10 +119,10 @@ class riscv_instr_stream extends uvm_object;
     if(idx == -1) begin
       idx = $urandom_range(0, current_instr_cnt-1);
       repeat(10) begin
-       if (instr_list[idx].atomic) break;
+       //if (instr_list[idx].atomic) break;
        idx = $urandom_range(0, current_instr_cnt-1);
       end
-      if (instr_list[idx].atomic) begin
+      /*if (instr_list[idx].atomic) begin
         foreach (instr_list[i]) begin
           if (!instr_list[i].atomic) begin
             idx = i;
@@ -94,7 +132,7 @@ class riscv_instr_stream extends uvm_object;
         if (instr_list[idx].atomic) begin
           `uvm_fatal(`gfn, $sformatf("Cannot inject the instruction"))
         end
-      end
+      end*/
     end else if((idx > current_instr_cnt) || (idx < 0)) begin
       `uvm_error(`gfn, $sformatf("Cannot insert instr stream at idx %0d", idx))
     end
@@ -103,19 +141,33 @@ class riscv_instr_stream extends uvm_object;
     if(replace) begin
       new_instr[0].label = instr_list[idx].label;
       new_instr[0].has_label = instr_list[idx].has_label;
+      `ifdef EXP
+		for (int i=idx;i<idx+new_instr_cnt;i++)
+			instr_list[i]=new_instr[i-idx];
+      `else
       if (idx == 0) begin
         instr_list = {new_instr, instr_list[idx+1:current_instr_cnt-1]};
       end else begin
         instr_list = {instr_list[0:idx-1], new_instr, instr_list[idx+1:current_instr_cnt-1]};
       end
+      `endif
     end else begin
+	    `ifdef EXP
+		instr_list = new[current_instr_cnt+new_instr_cnt](instr_list);
+		for (int i = current_instr_cnt+new_instr_cnt;i>=idx+new_instr_cnt;i--)
+			instr_list[i] = instr_list[i-new_instr_cnt];
+		for (int i = idx; i <idx+new_instr_cnt;i++)
+			instr_list[i] = new_instr[i-idx];
+	    `else
       if (idx == 0) begin
         instr_list = {new_instr, instr_list[idx:current_instr_cnt-1]};
       end else begin
         instr_list = {instr_list[0:idx-1], new_instr, instr_list[idx:current_instr_cnt-1]};
       end
+      `endif
     end
   endfunction
+
 
   // Mix the input instruction stream with the original instruction, the instruction order is
   // preserved. When 'contained' is set, the original instruction stream will be inside the
@@ -169,8 +221,15 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
 
   virtual function void create_instr_instance();
     riscv_instr instr;
+    `ifdef EXP
+	    instr_list = new[instr_cnt];
+    `endif
     for (int i = 0; i < instr_cnt; i++) begin
+	`ifdef EXP
+		instr_list[i]=null;
+	`else
       instr_list.push_back(null);
+      `endif
     end
   endfunction
 
@@ -208,8 +267,16 @@ class riscv_rand_instr_stream extends riscv_instr_stream;
     end
     // Do not allow branch instruction as the last instruction because there's no
     // forward branch target
+    `ifdef EXP
+    while (instr_list[instr_list.size()-1].category == BRANCH) begin
+    `else
     while (instr_list[$].category == BRANCH) begin
+    `endif
+	    `ifdef EXP
+		 instr_list = new[instr_list.size()-1](instr_list);
+	    `else
       void'(instr_list.pop_back());
+      `endif
       if (instr_list.size() == 0) break;
     end
   endfunction
