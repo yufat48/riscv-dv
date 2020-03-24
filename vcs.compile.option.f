@@ -16,4 +16,6 @@
 -ntb_opts uvm-1.2
 -lca
 +define+UVM_REGEX_NO_DPI
++define+EXP
 -timescale=1ns/10ps
+-cpp g++-4.8 -cc gcc-4.8 -LDFLAGS -Wl,--no-as-needed
