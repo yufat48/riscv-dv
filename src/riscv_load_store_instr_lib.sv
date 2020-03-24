@@ -209,7 +209,12 @@ class riscv_load_store_base_instr_stream extends riscv_mem_access_stream;
       instr.rs1 = rs1_reg;
       instr.imm_str = $sformatf("%0d", $signed(offset[i]));
       instr.process_load_store = 0;
+      `ifdef EXP
+      instr_list = new[instr_list.size()+1](instr_list);
+      insert_dynamic(instr,instr_list.size()-1);
+      `else
       instr_list.push_back(instr);
+      `endif
       load_store_instr.push_back(instr);
     end
   endfunction
