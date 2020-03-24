@@ -76,7 +76,13 @@ class riscv_amo_base_instr_stream extends riscv_mem_access_stream;
       la_instr.pseudo_instr_name = LA;
       la_instr.rd = rs1_reg[i];
       la_instr.imm_str = $sformatf("%0s+%0d", cfg.amo_region[data_page_id].name, offset[i]);
+      `ifdef EXP
+	     instr_list = new[instr_list.size()+1](instr_list);
+	    insert_dynamic(la_instr, 0);
+
+      `else
       instr_list.push_front(la_instr);
+      `endif
     end
   endfunction
 
@@ -144,8 +150,14 @@ class riscv_lr_sc_instr_stream extends riscv_amo_base_instr_stream;
       }
       rd != rs1_reg[0];
     )
+    `ifdef EXP
+	 instr_list = new[instr_list.size()+2](instr_list);
+      insert_dynamic(lr_instr,instr_list.size()-1); 
+      insert_dynamic(sc_instr,instr_list.size()); 
+    `else
     instr_list.push_back(lr_instr);
     instr_list.push_back(sc_instr);
+    `endif
   endfunction
 
 endclass : riscv_lr_sc_instr_stream
@@ -183,7 +195,12 @@ class riscv_amo_instr_stream extends riscv_amo_base_instr_stream;
         rs1 inside {rs1_reg};
         !(rd inside {rs1_reg});
       )
+      `ifdef EXP
+      	    instr_list = new[instr_list.size()+1](instr_list);
+	    insert_dynamic(amo_instr[i], 0);
+      `else
       instr_list.push_front(amo_instr[i]);
+      `endif
     end
   endfunction
 
