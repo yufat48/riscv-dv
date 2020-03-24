@@ -21,19 +21,19 @@ class riscv_vector_cfg extends uvm_object;
   rand bit [XLEN-1:0]    vstart;
   rand vxrm_t            vxrm;
   rand bit               vxsat;
-
+  int VLEN_8 = $clog2(VLEN/8);
   constraint legal_c {
     solve vtype before vl;
     solve vl before vstart;
     vstart <= vl;
-    vtype.vsew <= $clog2(VLEN/8);
-    vl <= (1 << ($clog2(VLEN/8) - vtype.vsew));
+    vtype.vsew <= VLEN_8;
+    vl <= (1 << (VLEN_8 - vtype.vsew));
   }
 
   // Basic constraint for initial bringup
   constraint bringup_c {
     vstart == 0;
-    vl == (1 << ($clog2(VLEN/8) - vtype.vsew));
+    vl == (1 << (VLEN_8 - vtype.vsew));
     vtype.vlmul == 0;
     vtype.vediv == 0;
     vtype.vsew == 2;
